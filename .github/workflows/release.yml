@@ -55,7 +55,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # A pinned image, not ubuntu-latest: the executable needs at least the glibc it was built against
+          # Pinned image, not ubuntu-latest: the executable needs at least the glibc it was built against
           # (2.39 here), so a newer image would silently drop older distributions.
           - { preset: dist-linux, runner: ubuntu-24.04 }
           - { preset: dist-macos, runner: macos-latest }
