@@ -1,7 +1,7 @@
 # logger
 
-[![release](https://img.shields.io/github/v/release/cthunter01/logger)](https://github.com/cthunter01/logger/releases/latest)
-[![CI](https://github.com/cthunter01/logger/actions/workflows/ci.yml/badge.svg)](https://github.com/cthunter01/logger/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/cthunter01/cpplogger)](https://github.com/cthunter01/cpplogger/releases/latest)
+[![CI](https://github.com/cthunter01/cpplogger/actions/workflows/ci.yml/badge.svg)](https://github.com/cthunter01/cpplogger/actions/workflows/ci.yml)
 ![platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows%20%7C%20FreeBSD-blue)
 ![C++](https://img.shields.io/badge/C%2B%2B-23-blue)
 
