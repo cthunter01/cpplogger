@@ -1,0 +1,112 @@
+# Cuts a release when run by hand (never on a push): Actions > Release > Run workflow, or
+#     gh workflow run release.yml [-f prerelease=true] [--ref <branch>]
+# The version is project(VERSION) in CMakeLists.txt: raise it and push before running this.
+# Runs all of CI and builds the dist-linux, dist-macos and dist-windows archives (CMakePresets.json). Only when
+# all of that passes does it tag the commit v<version> and publish a GitHub release with the archives and a
+# SHA256SUMS file.
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      prerelease:
+        description: Mark the release as a pre-release
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency: release
+
+jobs:
+  version:
+    name: version
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Read project(VERSION) and check its tag is new
+        id: version
+        run: |
+          version=$(sed -nE 's/^[[:space:]]*project\([[:alnum:]_]+[[:space:]]+VERSION[[:space:]]+([0-9.]+).*/\1/p' CMakeLists.txt)
+          if [[ -z $version ]]; then
+            echo "::error file=CMakeLists.txt::found no 'project(<name> VERSION x.y.z' line"
+            exit 1
+          fi
+          tag=v$version
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+            echo "::error file=CMakeLists.txt::$tag already exists; raise VERSION in project() and push first"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Releasing $tag from $GITHUB_REF_NAME at $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+
+  ci:
+    needs: version
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    name: build / ${{ matrix.preset }}
+    needs: version
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # A pinned image, not ubuntu-latest: the executable needs at least the glibc it was built against
+          # (2.39 here), so a newer image would silently drop older distributions.
+          - { preset: dist-linux, runner: ubuntu-24.04 }
+          - { preset: dist-macos, runner: macos-latest }
+          - { preset: dist-windows, runner: windows-latest }
+    steps:
+      - name: Make g++ GCC 14 (Ubuntu 24.04's default, GCC 13, has no <print>)
+        if: runner.os == 'Linux'
+        run: sudo ln -sf /usr/bin/g++-14 /usr/local/bin/g++
+      - name: Install Ninja
+        if: runner.os == 'macOS'
+        run: brew install ninja
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+      - uses: actions/checkout@v7
+      - name: Configure, build, test and package
+        run: cmake --workflow --preset ${{ matrix.preset }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.preset }}
+          path: |
+            build/${{ matrix.preset }}/package/*.tar.gz
+            build/${{ matrix.preset }}/package/*.zip
+          if-no-files-found: error
+
+  release:
+    name: release
+    needs: [version, ci, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Tag ${{ needs.version.outputs.tag }}
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR_ID+$GITHUB_ACTOR@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG" "$GITHUB_SHA"
+          git push origin "refs/tags/$TAG"
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          cd dist
+          sha256sum -- * > SHA256SUMS
+          url=$(gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes \
+                --prerelease="$PRERELEASE" -- *)
+          echo "Published $url" >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,340 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 28, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_COLOR_DIAGNOSTICS": "ON"
+      }
+    },
+    {
+      "name": "clang",
+      "hidden": true,
+      "inherits": "base",
+      "condition": { "type": "notEquals", "lhs": "${hostSystemName}", "rhs": "Windows" },
+      "cacheVariables": { "CMAKE_CXX_COMPILER": "clang++" }
+    },
+    {
+      "name": "gcc",
+      "hidden": true,
+      "inherits": "base",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" },
+      "cacheVariables": { "CMAKE_CXX_COMPILER": "g++" }
+    },
+    {
+      "name": "msvc",
+      "hidden": true,
+      "inherits": "base",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" },
+      "architecture": { "value": "x64", "strategy": "external" },
+      "toolset": { "value": "host=x64", "strategy": "external" },
+      "cacheVariables": { "CMAKE_CXX_COMPILER": "cl" }
+    },
+    {
+      "name": "werror",
+      "hidden": true,
+      "cacheVariables": { "LOGGER_WARNINGS_AS_ERRORS": "ON" }
+    },
+    {
+      "name": "clang-debug",
+      "displayName": "Clang Debug",
+      "inherits": "clang",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "clang-release",
+      "displayName": "Clang Release",
+      "inherits": "clang",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "gcc-debug",
+      "displayName": "GCC Debug",
+      "inherits": "gcc",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "gcc-release",
+      "displayName": "GCC Release",
+      "inherits": "gcc",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "msvc-debug",
+      "displayName": "MSVC Debug",
+      "inherits": "msvc",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "msvc-release",
+      "displayName": "MSVC Release",
+      "inherits": "msvc",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "asan",
+      "displayName": "Clang Debug, AddressSanitizer + UndefinedBehaviorSanitizer",
+      "inherits": "clang",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "LOGGER_SANITIZERS": "address;undefined" }
+    },
+    {
+      "name": "tsan",
+      "displayName": "Clang RelWithDebInfo, ThreadSanitizer",
+      "inherits": "clang",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "LOGGER_SANITIZERS": "thread" }
+    },
+    {
+      "name": "coverage",
+      "displayName": "Clang Debug, source-based coverage",
+      "inherits": "clang",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "LOGGER_ENABLE_COVERAGE": "ON" }
+    },
+    {
+      "name": "tidy",
+      "displayName": "Clang Debug, clang-tidy while compiling, warnings as errors",
+      "inherits": ["clang", "werror"],
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "LOGGER_ENABLE_CLANG_TIDY": "ON" }
+    },
+    {
+      "name": "ci-gcc",
+      "displayName": "GCC Release, warnings as errors",
+      "inherits": ["gcc-release", "werror"]
+    },
+    {
+      "name": "ci-clang",
+      "displayName": "Clang Release, warnings as errors",
+      "inherits": ["clang-release", "werror"]
+    },
+    {
+      "name": "ci-msvc",
+      "displayName": "MSVC Release, warnings as errors",
+      "inherits": ["msvc-release", "werror"]
+    },
+    {
+      "name": "dist",
+      "hidden": true,
+      "description": "Release archives: dependencies are built from source and linked in, never taken from the build machine",
+      "cacheVariables": { "FETCHCONTENT_TRY_FIND_PACKAGE_MODE": "NEVER" }
+    },
+    {
+      "name": "dist-linux",
+      "displayName": "Linux release archive: GCC Release, libstdc++ and libgcc linked statically",
+      "inherits": ["ci-gcc", "dist"],
+      "cacheVariables": {
+        "CMAKE_EXE_LINKER_FLAGS": "-static-libstdc++ -static-libgcc",
+        "CPACK_STRIP_FILES": "ON",
+        "CPACK_SYSTEM_NAME": "linux-x86_64"
+      }
+    },
+    {
+      "name": "dist-macos",
+      "displayName": "macOS release archive: Apple Clang Release, universal binary for macOS 14+",
+      "inherits": ["ci-clang", "dist"],
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin" },
+      "cacheVariables": {
+        "CMAKE_OSX_ARCHITECTURES": "arm64;x86_64",
+        "CMAKE_OSX_DEPLOYMENT_TARGET": "14.0",
+        "CPACK_SYSTEM_NAME": "macos-universal"
+      }
+    },
+    {
+      "name": "dist-windows",
+      "displayName": "Windows release archive: MSVC Release, C/C++ runtime linked statically",
+      "inherits": ["ci-msvc", "dist"],
+      "cacheVariables": {
+        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded",
+        "CPACK_SYSTEM_NAME": "windows-x86_64"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "clang-debug", "configurePreset": "clang-debug" },
+    { "name": "clang-release", "configurePreset": "clang-release" },
+    { "name": "gcc-debug", "configurePreset": "gcc-debug" },
+    { "name": "gcc-release", "configurePreset": "gcc-release" },
+    { "name": "msvc-debug", "configurePreset": "msvc-debug" },
+    { "name": "msvc-release", "configurePreset": "msvc-release" },
+    { "name": "asan", "configurePreset": "asan" },
+    { "name": "tsan", "configurePreset": "tsan" },
+    { "name": "coverage", "configurePreset": "coverage", "targets": ["coverage"] },
+    { "name": "tidy", "configurePreset": "tidy" },
+    { "name": "ci-gcc", "configurePreset": "ci-gcc" },
+    { "name": "ci-clang", "configurePreset": "ci-clang" },
+    { "name": "ci-msvc", "configurePreset": "ci-msvc" },
+    { "name": "dist-linux", "configurePreset": "dist-linux" },
+    { "name": "dist-macos", "configurePreset": "dist-macos" },
+    { "name": "dist-windows", "configurePreset": "dist-windows" }
+  ],
+  "testPresets": [
+    {
+      "name": "test-base",
+      "hidden": true,
+      "output": { "outputOnFailure": true },
+      "execution": { "noTestsAction": "error" }
+    },
+    { "name": "clang-debug", "inherits": "test-base", "configurePreset": "clang-debug" },
+    { "name": "clang-release", "inherits": "test-base", "configurePreset": "clang-release" },
+    { "name": "gcc-debug", "inherits": "test-base", "configurePreset": "gcc-debug" },
+    { "name": "gcc-release", "inherits": "test-base", "configurePreset": "gcc-release" },
+    { "name": "msvc-debug", "inherits": "test-base", "configurePreset": "msvc-debug" },
+    { "name": "msvc-release", "inherits": "test-base", "configurePreset": "msvc-release" },
+    {
+      "name": "asan",
+      "inherits": "test-base",
+      "configurePreset": "asan",
+      "environment": {
+        "ASAN_OPTIONS": "detect_stack_use_after_return=1:strict_string_checks=1",
+        "UBSAN_OPTIONS": "print_stacktrace=1"
+      }
+    },
+    {
+      "name": "tsan",
+      "inherits": "test-base",
+      "configurePreset": "tsan",
+      "environment": { "TSAN_OPTIONS": "halt_on_error=1" }
+    },
+    { "name": "tidy", "inherits": "test-base", "configurePreset": "tidy" },
+    { "name": "ci-gcc", "inherits": "test-base", "configurePreset": "ci-gcc" },
+    { "name": "ci-clang", "inherits": "test-base", "configurePreset": "ci-clang" },
+    { "name": "ci-msvc", "inherits": "test-base", "configurePreset": "ci-msvc" },
+    { "name": "dist-linux", "inherits": "test-base", "configurePreset": "dist-linux" },
+    { "name": "dist-macos", "inherits": "test-base", "configurePreset": "dist-macos" },
+    { "name": "dist-windows", "inherits": "test-base", "configurePreset": "dist-windows" }
+  ],
+  "packagePresets": [
+    {
+      "name": "package-base",
+      "hidden": true,
+      "packageDirectory": "${sourceDir}/build/${presetName}/package"
+    },
+    {
+      "name": "dist-linux",
+      "inherits": "package-base",
+      "configurePreset": "dist-linux",
+      "generators": ["TGZ"]
+    },
+    {
+      "name": "dist-macos",
+      "inherits": "package-base",
+      "configurePreset": "dist-macos",
+      "generators": ["TGZ"]
+    },
+    {
+      "name": "dist-windows",
+      "inherits": "package-base",
+      "configurePreset": "dist-windows",
+      "generators": ["ZIP"]
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "dev",
+      "displayName": "Configure, build and test Clang Debug",
+      "steps": [
+        { "type": "configure", "name": "clang-debug" },
+        { "type": "build", "name": "clang-debug" },
+        { "type": "test", "name": "clang-debug" }
+      ]
+    },
+    {
+      "name": "dev-msvc",
+      "displayName": "Configure, build and test MSVC Debug",
+      "steps": [
+        { "type": "configure", "name": "msvc-debug" },
+        { "type": "build", "name": "msvc-debug" },
+        { "type": "test", "name": "msvc-debug" }
+      ]
+    },
+    {
+      "name": "ci-gcc",
+      "steps": [
+        { "type": "configure", "name": "ci-gcc" },
+        { "type": "build", "name": "ci-gcc" },
+        { "type": "test", "name": "ci-gcc" }
+      ]
+    },
+    {
+      "name": "ci-clang",
+      "steps": [
+        { "type": "configure", "name": "ci-clang" },
+        { "type": "build", "name": "ci-clang" },
+        { "type": "test", "name": "ci-clang" }
+      ]
+    },
+    {
+      "name": "ci-msvc",
+      "steps": [
+        { "type": "configure", "name": "ci-msvc" },
+        { "type": "build", "name": "ci-msvc" },
+        { "type": "test", "name": "ci-msvc" }
+      ]
+    },
+    {
+      "name": "asan",
+      "steps": [
+        { "type": "configure", "name": "asan" },
+        { "type": "build", "name": "asan" },
+        { "type": "test", "name": "asan" }
+      ]
+    },
+    {
+      "name": "tsan",
+      "steps": [
+        { "type": "configure", "name": "tsan" },
+        { "type": "build", "name": "tsan" },
+        { "type": "test", "name": "tsan" }
+      ]
+    },
+    {
+      "name": "tidy",
+      "steps": [
+        { "type": "configure", "name": "tidy" },
+        { "type": "build", "name": "tidy" },
+        { "type": "test", "name": "tidy" }
+      ]
+    },
+    {
+      "name": "coverage",
+      "displayName": "Run the tests with coverage and write the report",
+      "steps": [
+        { "type": "configure", "name": "coverage" },
+        { "type": "build", "name": "coverage" }
+      ]
+    },
+    {
+      "name": "dist-linux",
+      "displayName": "Build, test and package the Linux release archive",
+      "steps": [
+        { "type": "configure", "name": "dist-linux" },
+        { "type": "build", "name": "dist-linux" },
+        { "type": "test", "name": "dist-linux" },
+        { "type": "package", "name": "dist-linux" }
+      ]
+    },
+    {
+      "name": "dist-macos",
+      "displayName": "Build, test and package the macOS release archive",
+      "steps": [
+        { "type": "configure", "name": "dist-macos" },
+        { "type": "build", "name": "dist-macos" },
+        { "type": "test", "name": "dist-macos" },
+        { "type": "package", "name": "dist-macos" }
+      ]
+    },
+    {
+      "name": "dist-windows",
+      "displayName": "Build, test and package the Windows release archive",
+      "steps": [
+        { "type": "configure", "name": "dist-windows" },
+        { "type": "build", "name": "dist-windows" },
+        { "type": "test", "name": "dist-windows" },
+        { "type": "package", "name": "dist-windows" }
+      ]
+    }
+  ]
+}

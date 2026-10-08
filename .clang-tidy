@@ -1,0 +1,139 @@
+# Whole check families are enabled; the checks that are mostly noise are turned off.
+# Findings are warnings here (clangd shows them in the editor); the `tidy` preset and CI make them errors.
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  clang-analyzer-*,
+  concurrency-*,
+  cppcoreguidelines-*,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-non-private-member-variables-in-classes,
+  -cppcoreguidelines-pro-bounds-avoid-unchecked-container-access,
+  misc-*,
+  -misc-no-recursion,
+  -misc-non-private-member-variables-in-classes,
+  modernize-*,
+  -modernize-use-trailing-return-type,
+  performance-*,
+  portability-*,
+  -portability-avoid-pragma-once,
+  readability-*,
+  -readability-identifier-length,
+  -readability-magic-numbers
+
+WarningsAsErrors: ''
+HeaderFilterRegex: '(include|src|tests)/'
+ExcludeHeaderFilterRegex: '_deps/'
+FormatStyle: file
+
+CheckOptions:
+  # ---------------------------------------------------------------------------
+  # Naming: types
+  # Valid cases: lower_case, UPPER_CASE, camelBack, CamelCase,
+  #              camel_Snake_Back, Camel_Snake_Case, Leading_upper_snake_case
+  # ---------------------------------------------------------------------------
+  readability-identifier-naming.NamespaceCase: lower_case
+  readability-identifier-naming.ClassCase: CamelCase
+  readability-identifier-naming.StructCase: CamelCase
+  readability-identifier-naming.UnionCase: CamelCase
+  readability-identifier-naming.EnumCase: CamelCase
+  readability-identifier-naming.EnumConstantCase: UPPER_CASE
+  # Scoped enumerators are CamelCase (C++ Core Guidelines Enum.5): ALL_CAPS names such as ERROR and DEBUG are
+  # macros in <windows.h> and in Xcode debug builds, and logger::Level must survive both.
+  readability-identifier-naming.ScopedEnumConstantCase: CamelCase
+  readability-identifier-naming.TypeAliasCase: CamelCase
+  readability-identifier-naming.TypedefCase: CamelCase
+  readability-identifier-naming.TemplateParameterCase: CamelCase
+  readability-identifier-naming.TypeTemplateParameterCase: CamelCase
+  readability-identifier-naming.ValueTemplateParameterCase: CamelCase
+  readability-identifier-naming.TemplateTemplateParameterCase: CamelCase
+  readability-identifier-naming.ConceptCase: CamelCase
+
+  # ---------------------------------------------------------------------------
+  # Naming: functions
+  # ---------------------------------------------------------------------------
+  readability-identifier-naming.FunctionCase: lower_case
+  #readability-identifier-naming.GlobalFunctionCase: camelBack
+  readability-identifier-naming.MethodCase: CamelCase
+  # Don't flag main(int argc, char** argv) and similar.
+  readability-identifier-naming.IgnoreMainLikeFunctions: true
+
+  # ---------------------------------------------------------------------------
+  # Naming: variables and parameters
+  # ---------------------------------------------------------------------------
+  readability-identifier-naming.VariableCase: camelBack
+  readability-identifier-naming.LocalVariableCase: camelBack
+  readability-identifier-naming.ParameterCase: camelBack
+  readability-identifier-naming.PointerParameterCase: camelBack
+
+  # Mutable globals and statics carry a scope prefix.
+  readability-identifier-naming.GlobalVariableCase: camelBack
+  readability-identifier-naming.GlobalVariablePrefix: g_
+  readability-identifier-naming.StaticVariableCase: camelBack
+  readability-identifier-naming.StaticVariablePrefix: s_
+
+  # ---------------------------------------------------------------------------
+  # Naming: class members
+  # Prefer a trailing underscore instead? Remove the *Prefix lines and add
+  #   readability-identifier-naming.PrivateMemberSuffix: _
+  # ---------------------------------------------------------------------------
+  readability-identifier-naming.MemberCase: camelBack
+  readability-identifier-naming.PublicMemberCase: camelBack
+  readability-identifier-naming.PrivateMemberCase: camelBack
+  readability-identifier-naming.ProtectedMemberCase: camelBack
+  readability-identifier-naming.ClassMemberCase: camelBack
+
+  # ---------------------------------------------------------------------------
+  # Naming: constants (kCamelCase)
+  # For UPPER_CASE constants instead, set the *Case lines to UPPER_CASE
+  # and delete the *Prefix lines.
+  # ---------------------------------------------------------------------------
+  readability-identifier-naming.ConstexprVariableCase: CamelCase
+  readability-identifier-naming.ConstexprVariablePrefix: k
+  readability-identifier-naming.GlobalConstantCase: CamelCase
+  readability-identifier-naming.GlobalConstantPrefix: k
+  readability-identifier-naming.StaticConstantCase: CamelCase
+  readability-identifier-naming.StaticConstantPrefix: k
+  readability-identifier-naming.ClassConstantCase: CamelCase
+  readability-identifier-naming.ClassConstantPrefix: k
+  # Local `const int x = f();` is just a variable that doesn't change.
+  readability-identifier-naming.LocalConstantCase: camelBack
+  readability-identifier-naming.ConstantParameterCase: camelBack
+  readability-identifier-naming.ConstantMemberCase: camelBack
+
+  # ---------------------------------------------------------------------------
+  # Macros
+  # ---------------------------------------------------------------------------
+  readability-identifier-naming.MacroDefinitionCase: UPPER_CASE
+  # Allow header guards and a project-prefixed set of macros; function-like
+  # macros that don't match this regex are flagged (prefer constexpr/inline).
+  cppcoreguidelines-macro-usage.AllowedRegexp: '^([A-Z0-9_]+_H_?|LOGGER_[A-Z0-9_]+)$'
+  cppcoreguidelines-macro-usage.CheckCapsOnly: false
+  cppcoreguidelines-macro-usage.IgnoreCommandLineMacros: true
+
+  # ---------------------------------------------------------------------------
+  # Types
+  # ---------------------------------------------------------------------------
+  # Flag `short`, `long`, `long long`; prefer <cstdint> fixed-width types.
+  google-runtime-int.TypeSuffix: _t
+  google-runtime-int.UnsignedTypePrefix: uint
+  google-runtime-int.SignedTypePrefix: int
+  # `using` over `typedef`, including in extern "C" blocks.
+  modernize-use-using.IgnoreExternC: false
+  # Use `auto` only when the type is spelled out elsewhere (casts, new, iterators).
+  modernize-use-auto.MinTypeNameLength: 5
+  modernize-use-auto.RemoveStars: false
+  # Allow implicit pointer->bool (`if (ptr)`), but not int->bool.
+  readability-implicit-bool-conversion.AllowPointerConditions: true
+  readability-implicit-bool-conversion.AllowIntegerConditions: false
+  # Single-arg constructors must be `explicit`.
+  google-explicit-constructor.IgnoredConversionOperators: ''
+
+  # ---------------------------------------------------------------------------
+  # Trailing commas (clang-tidy 23+): multi-line initializer lists end in a comma, so clang-format puts one
+  # element per line. Single-line lists are left alone: there the check is buggy (it takes the comma after
+  # `Type{}` in a call's argument list for a trailing one, and its fix-it removes it).
+  # ---------------------------------------------------------------------------
+  readability-trailing-comma.MultiLineCommaPolicy: Append
+  readability-trailing-comma.SingleLineCommaPolicy: Ignore

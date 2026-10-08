@@ -1,0 +1,84 @@
+# Builds and tests the CI presets on Linux, macOS, Windows and FreeBSD, and checks formatting.
+# Linux runs in an Arch Linux container so CI has the same current GCC/Clang as the dev machine.
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_call:   # the Release workflow runs all of CI before it tags
+
+jobs:
+  linux:
+    name: linux / ${{ matrix.preset }}
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [ci-gcc, ci-clang, asan, tidy]
+    steps:
+      - name: Install toolchain
+        run: pacman -Syu --noconfirm --needed cmake ninja clang git
+      - uses: actions/checkout@v7
+      - name: Configure, build and test
+        run: cmake --workflow --preset ${{ matrix.preset }}
+
+  # Apple Clang from the runner's default Xcode.
+  # No asan here: the Linux asan job sanitizes the same code, and Linux also has leak detection, which Apple's
+  # AddressSanitizer runtime lacks. The asan preset itself still works on a Mac for local use.
+  macos:
+    name: macos / ${{ matrix.preset }}
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [ci-clang]
+    steps:
+      - name: Install Ninja
+        run: brew install ninja
+      - uses: actions/checkout@v7
+      - name: Configure, build and test
+        run: cmake --workflow --preset ${{ matrix.preset }}
+
+  # MSVC from the runner's Visual Studio; msvc-dev-cmd sets up the Developer PowerShell environment.
+  windows:
+    name: windows / ci-msvc
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Configure, build and test
+        run: cmake --workflow --preset ci-msvc
+
+  # GitHub has no FreeBSD runner, so this boots a FreeBSD VM on the Linux one and runs the preset inside it.
+  # release "15" is the newest 15.x. The compiler is the base system's Clang with libc++.
+  freebsd:
+    name: freebsd / ${{ matrix.preset }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [ci-clang]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Configure, build and test
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: "15"
+          copyback: false   # nothing built in the VM is needed on the runner afterwards
+          prepare: pkg install -y cmake-core ninja git-lite
+          run: cmake --workflow --preset ${{ matrix.preset }}
+
+  format:
+    name: clang-format
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - name: Install clang-format
+        run: pacman -Syu --noconfirm --needed clang git
+      - uses: actions/checkout@v7
+      - name: Check formatting
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git ls-files -z -- '*.c' '*.cc' '*.cpp' '*.cxx' '*.h' '*.hpp' \
+            | xargs -0 --no-run-if-empty clang-format --dry-run --Werror
