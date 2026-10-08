@@ -5,8 +5,8 @@
 #include <format>
 #include <fstream>
 #include <ios>
-#include <iterator>
 #include <random>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <system_error>
@@ -40,8 +40,12 @@ protected:
 
     [[nodiscard]] std::string Contents() const
     {
-        std::ifstream in(path, std::ios::binary);
-        return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+        // Not std::istreambuf_iterator: GCC 14 (the release archive's compiler) reports a null
+        // dereference inside libstdc++ for it at -O3, which -Werror turns into a failed build.
+        const std::ifstream in(path, std::ios::binary);
+        std::ostringstream  contents;
+        contents << in.rdbuf();
+        return contents.str();
     }
 
     static logger::Record MakeRecord(const std::string& message)
