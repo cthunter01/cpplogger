@@ -30,9 +30,32 @@ if(LOGGER_ENABLE_CLANG_TIDY)
     endif()
 endif()
 
+# logger_sanitize_target(<target>)
+# Applies LOGGER_SANITIZERS to a target. logger_configure_target() does this for our targets. A dependency built
+# from source needs it as well (see Dependencies.cmake): a sanitizer has to instrument the whole program.
+function(logger_sanitize_target target)
+    if(NOT LOGGER_SANITIZERS)
+        return()
+    endif()
+    list(JOIN LOGGER_SANITIZERS "," sanitizers)
+    set(sanitize -fsanitize=${sanitizers})
+    if("undefined" IN_LIST LOGGER_SANITIZERS)
+        list(APPEND sanitize -fno-sanitize-recover=all)   # UB stops the program, so a test fails
+    endif()
+    target_compile_options(${target} PRIVATE ${sanitize} -fno-omit-frame-pointer)
+    target_link_options(${target} PUBLIC ${sanitize})
+    if("address" IN_LIST LOGGER_SANITIZERS)
+        # libstdc++ annotates std::vector's spare capacity for ASan only on request (libc++ does it by
+        # default), so reads past size() but within capacity() are caught. Ignored by libc++ and MSVC.
+        # Every translation unit in the program must agree on this: a vector that annotated code poisoned and
+        # unannotated code then grew is reported as a container-overflow that never happened.
+        target_compile_definitions(${target} PRIVATE _GLIBCXX_SANITIZE_VECTOR)
+    endif()
+endfunction()
+
 # logger_configure_target(<target>)
-# Applies warnings, sanitizers, coverage, clang-tidy and IPO to one of *our* targets (never to dependencies).
-# Call it for every target you add.
+# Applies warnings, sanitizers, coverage, clang-tidy and IPO to one of *our* targets. Dependencies get the
+# sanitizers only, through logger_sanitize_target(). Call it for every target you add.
 function(logger_configure_target target)
     if(MSVC)   # cl, and clang-cl (which takes the same options)
         set(msvc_options
@@ -59,20 +82,7 @@ function(logger_configure_target target)
             $<$<CONFIG:Debug>:_GLIBCXX_ASSERTIONS>
             $<$<CONFIG:Debug>:_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_EXTENSIVE>)
 
-        if(LOGGER_SANITIZERS)
-            list(JOIN LOGGER_SANITIZERS "," sanitizers)
-            set(sanitize -fsanitize=${sanitizers})
-            if("undefined" IN_LIST LOGGER_SANITIZERS)
-                list(APPEND sanitize -fno-sanitize-recover=all)   # UB stops the program, so a test fails
-            endif()
-            target_compile_options(${target} PRIVATE ${sanitize} -fno-omit-frame-pointer)
-            target_link_options(${target} PUBLIC ${sanitize})
-            if("address" IN_LIST LOGGER_SANITIZERS)
-                # libstdc++ annotates std::vector's spare capacity for ASan only on request (libc++ does it by
-                # default), so reads past size() but within capacity() are caught. Ignored by libc++ and MSVC.
-                target_compile_definitions(${target} PRIVATE _GLIBCXX_SANITIZE_VECTOR)
-            endif()
-        endif()
+        logger_sanitize_target(${target})
     endif()
 
     if(LOGGER_ENABLE_COVERAGE)
