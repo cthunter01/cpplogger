@@ -26,6 +26,7 @@ int main()
 ```
 
 ## Using the library
+
 Add the repository with `add_subdirectory` or `FetchContent` and link `logger::lib`:
 
 ```cmake
@@ -39,18 +40,20 @@ The library's own tests, demo and docs are built only when it is the top-level p
 `LOGGER_BUILD_DEMO`, `LOGGER_BUILD_DOCS`), so a consumer gets the `logger_lib` target and nothing else.
 
 ### API (`logger/logger.h`)
-| Call | What it does |
-| --- | --- |
-| `logger::error/warn/info/debug/perf(fmt, args...)` | Logs at that level. `fmt` is checked at compile time like `std::format`; the arguments are formatted on the calling thread. Never throws. |
-| `logger::log(level, fmt, args...)` | The same with a level chosen at run time (for wrappers). |
-| `logger::set_level(level)`, `current_level()`, `is_enabled(level)` | The threshold. A record is written when its level is at or below it; `Level::Off` silences everything. Default `Info`. |
-| `logger::add_sink(sink)`, `add_sink<S>(args...)`, `clear_sinks()` | Sinks receive every record in the order they were added. With none configured, a `ConsoleSink` writes to stdout. `clear_sinks()` flushes first. |
-| `logger::set_error_handler(handler)` | Receives one message per failure (a sink that threw, a message whose formatter threw, a bad `LOGGER_LEVEL`, ...). The default prints the first one to stderr, then stays quiet. |
-| `logger::set_queue_capacity(n)` | The queue bound, default 8192 records. When the queue is full, log calls block until there is room, so none of them is dropped. |
-| `logger::flush()` | Returns once every record logged before the call has been written to all sinks and the sinks flushed. |
-| `logger::shutdown()` | Drains, flushes and joins the worker. Optional: the same happens when the program exits (`main` returning or `std::exit`). The next log call starts a new worker. |
+
+| Call                                                               | What it does                                                                                                                                                                    |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `logger::error/warn/info/debug/perf(fmt, args...)`                 | Logs at that level. `fmt` is checked at compile time like `std::format`; the arguments are formatted on the calling thread. Never throws.                                       |
+| `logger::log(level, fmt, args...)`                                 | The same with a level chosen at run time (for wrappers).                                                                                                                        |
+| `logger::set_level(level)`, `current_level()`, `is_enabled(level)` | The threshold. A record is written when its level is at or below it; `Level::Off` silences everything. Default `Info`.                                                          |
+| `logger::add_sink(sink)`, `add_sink<S>(args...)`, `clear_sinks()`  | Sinks receive every record in the order they were added. With none configured, a `ConsoleSink` writes to stdout. `clear_sinks()` flushes first.                                 |
+| `logger::set_error_handler(handler)`                               | Receives one message per failure (a sink that threw, a message whose formatter threw, a bad `LOGGER_LEVEL`, ...). The default prints the first one to stderr, then stays quiet. |
+| `logger::set_queue_capacity(n)`                                    | The queue bound, default 8192 records. When the queue is full, log calls block until there is room, so none of them is dropped.                                                 |
+| `logger::flush()`                                                  | Returns once every record logged before the call has been written to all sinks and the sinks flushed.                                                                           |
+| `logger::shutdown()`                                               | Drains, flushes and joins the worker. Optional: the same happens when the program exits (`main` returning or `std::exit`). The next log call starts a new worker.               |
 
 ### Configuration
+
 - **`LOGGER_LEVEL`** (environment): `error`, `warn`, `info`, `debug`, `perf` or `off`, any case, read once at the
   logger's first use. `set_level()` in code wins. An unknown value is reported through the error handler and
   ignored.
@@ -63,6 +66,7 @@ The library's own tests, demo and docs are built only when it is the top-level p
   unit tests are not built (they assume every level is present); the demo still runs as a test.
 
 ### Sinks (`logger/Sink.h`)
+
 A sink is one class with one method. `Write()` and `Flush()` are only ever called by one thread at a time, so
 it needs no locking. Throw to report a failure; the logger reports it and carries on with the next sink.
 
@@ -83,6 +87,7 @@ record type and the layout helpers (`format_line`, `format_line_to`, `format_tim
 The standard line is `<UTC timestamp, ms> [<level, 5 wide>] <file basename>:<line> <message>`.
 
 ### Guarantees and limits
+
 - Log calls never throw and block only while the queue is full. Each thread's records are written in the order
   that thread logged them. A record is stamped when it is queued, so timestamps never run backwards in the output.
 - A sink or the error handler may log: such records are queued without blocking, and dropped (and reported) if
@@ -100,7 +105,11 @@ The standard line is `<UTC timestamp, ms> [<level, 5 wide>] <file basename>:<lin
 - If `logger::lib` ends up inside a Windows DLL, call `shutdown()` before `main` returns: the exit-time join
   would otherwise run under the loader lock.
 
+To see how the library is put together, [`docs/rebuild-guide/`](docs/rebuild-guide/README.md) rebuilds it from an
+empty directory in 14 steps, each of which compiles and passes its tests.
+
 ## Requirements
+
 - CMake 3.28+ and Ninja
 - A C++23 compiler with `<format>`, `std::source_location` and `consteval`:
   - Linux: GCC 14+ or Clang 18+
@@ -113,7 +122,9 @@ The standard line is `<UTC timestamp, ms> [<level, 5 wide>] <file basename>:<lin
 GoogleTest is used from the system when installed, otherwise downloaded at configure time.
 
 ## Build
+
 Linux, macOS and FreeBSD:
+
 ```sh
 cmake --workflow --preset dev          # configure + build + test, Clang Debug
 ./build/clang-debug/bin/logger
@@ -121,22 +132,23 @@ cmake --workflow --preset dev          # configure + build + test, Clang Debug
 
 Windows, from a **Developer PowerShell for VS** (Ninja needs MSVC's environment; VS Code's CMake Tools and
 Visual Studio set it up themselves):
+
 ```powershell
 cmake --workflow --preset dev-msvc     # configure + build + test, MSVC Debug
 .\build\msvc-debug\bin\logger.exe
 ```
 
-| Preset | Platforms | What it is |
-| --- | --- | --- |
-| `clang-debug`, `clang-release` | Linux, macOS, FreeBSD | Everyday builds (Apple Clang on macOS) |
-| `gcc-debug`, `gcc-release` | Linux | Everyday builds |
-| `msvc-debug`, `msvc-release` | Windows | Everyday builds |
-| `asan` | Linux, macOS | Clang Debug with AddressSanitizer + UndefinedBehaviorSanitizer |
-| `tsan` | Linux, macOS | Clang RelWithDebInfo with ThreadSanitizer |
-| `tidy` | Linux, macOS | Clang Debug running clang-tidy on every file; findings are errors |
-| `coverage` | Linux, macOS | `cmake --workflow --preset coverage` writes `build/coverage/coverage/html/index.html` |
-| `ci-gcc`, `ci-clang`, `ci-msvc` | as their compiler | Release builds with warnings as errors, as run in CI |
-| `dist-linux`, `dist-macos`, `dist-windows` | Linux, macOS, Windows | The release archives (see [Releases](#releases)) |
+| Preset                                     | Platforms             | What it is                                                                            |
+| ------------------------------------------ | --------------------- | ------------------------------------------------------------------------------------- |
+| `clang-debug`, `clang-release`             | Linux, macOS, FreeBSD | Everyday builds (Apple Clang on macOS)                                                |
+| `gcc-debug`, `gcc-release`                 | Linux                 | Everyday builds                                                                       |
+| `msvc-debug`, `msvc-release`               | Windows               | Everyday builds                                                                       |
+| `asan`                                     | Linux, macOS          | Clang Debug with AddressSanitizer + UndefinedBehaviorSanitizer                        |
+| `tsan`                                     | Linux, macOS          | Clang RelWithDebInfo with ThreadSanitizer                                             |
+| `tidy`                                     | Linux, macOS          | Clang Debug running clang-tidy on every file; findings are errors                     |
+| `coverage`                                 | Linux, macOS          | `cmake --workflow --preset coverage` writes `build/coverage/coverage/html/index.html` |
+| `ci-gcc`, `ci-clang`, `ci-msvc`            | as their compiler     | Release builds with warnings as errors, as run in CI                                  |
+| `dist-linux`, `dist-macos`, `dist-windows` | Linux, macOS, Windows | The release archives (see [Releases](#releases))                                      |
 
 A preset exists only on the platforms it supports; `cmake --list-presets` shows the ones for this machine.
 Each workflow preset (`dev`, `dev-msvc`, `ci-gcc`, `ci-clang`, `ci-msvc`, `asan`, `tsan`, `tidy`, `coverage`)
@@ -153,7 +165,9 @@ The demo executable (`src/main.cpp`) exercises every level, both sinks, two cust
 API docs: `cmake --build --preset clang-debug --target docs`, then open `build/clang-debug/docs/html/index.html`.
 
 ## Releases
+
 The Release workflow (`.github/workflows/release.yml`) runs only when started by hand, never on a push:
+
 1. Raise `VERSION` in `project()` in `CMakeLists.txt`, then commit and push.
 2. Start it from the Actions tab (Release > Run workflow, pick the branch) or with `gh workflow run release.yml`
    (`-f prerelease=true` marks it a pre-release).
@@ -162,11 +176,11 @@ It stops at once if the tag `v<version>` already exists. Otherwise it runs all o
 packages an archive on each platform. Only when every job passes does it tag the commit `v<version>` and
 publish a GitHub release with the archives, a `SHA256SUMS` file and generated release notes.
 
-| Archive | Built with | Usable with |
-| --- | --- | --- |
-| `logger-<version>-linux-x86_64.tar.gz` | GCC 14, Ubuntu 24.04 | the same major GCC and libstdc++ ABI |
-| `logger-<version>-macos-universal.tar.gz` | Apple Clang | Apple Clang, macOS 14+, Apple silicon and Intel |
-| `logger-<version>-windows-x86_64.zip` | MSVC, Release, static runtime (`/MT`) | MSVC Release builds using `/MT` |
+| Archive                                   | Built with                            | Usable with                                     |
+| ----------------------------------------- | ------------------------------------- | ----------------------------------------------- |
+| `logger-<version>-linux-x86_64.tar.gz`    | GCC 14, Ubuntu 24.04                  | the same major GCC and libstdc++ ABI            |
+| `logger-<version>-macos-universal.tar.gz` | Apple Clang                           | Apple Clang, macOS 14+, Apple silicon and Intel |
+| `logger-<version>-windows-x86_64.zip`     | MSVC, Release, static runtime (`/MT`) | MSVC Release builds using `/MT`                 |
 
 An archive holds what the `install()` rules install: `include/logger/*.h` and the static library. A static C++
 library only links into builds that use the same compiler family, standard library and (on Windows) runtime
